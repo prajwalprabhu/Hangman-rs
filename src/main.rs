@@ -1,68 +1,61 @@
 use rand::prelude::*;
 use std::collections::HashMap;
-use std::io::prelude::*;
+use std::io::{prelude::*, Stdin};
 #[derive(Debug)]
+
 struct HangMan {
-    word: Vec<char>,
-    required: HashMap<char, usize>,
-    given: String,
+    word: Vec<char>,                     // state of the current word
+    required: HashMap<char, Vec<usize>>, // hashmap which contains the map of char and positions in the word
+    given: String,                       // the given string
+    input: Stdin,                        // Standard input stream
 }
 impl HangMan {
-    // add code here
     pub fn new(given: String) -> HangMan {
-        let mut donec: Vec<char> = Vec::new();
-        let mut required: HashMap<char, usize> = HashMap::new();
+        let mut required = HashMap::<char, Vec<usize>>::new();
         let mut word: Vec<char> = given.chars().collect();
-        let mut i: usize = 0;
+        let mut i = 0;
+        let input = std::io::stdin();
+
         while i < word.len() {
-            if donec.contains(&word[i]) {
-                i += 1;
-            } else {
-                required.insert(word[i], i);
-                word[i] = '0';
-                donec.push(word[i]);
-                i += 2;
-            }
+            required
+                .entry(word[i])
+                .and_modify(|pos| pos.push(i))
+                .or_insert_with(|| vec![i]);
+
+            word[i] = '_';
+            i += 2;
         }
         HangMan {
             word,
             required,
             given,
+            input,
         }
     }
-    fn readchar(&self) -> char {
-        let mut input = std::io::stdin();
+    fn readchar(&mut self) -> char {
         let mut buff = [0u8];
-        input.read_exact(&mut buff).expect("Failed to read input");
-        let a = String::from_utf8_lossy(&buff);
-        let a: Vec<char> = a.chars().collect();
-        a[0]
+        self.input
+            .read_exact(&mut buff)
+            .expect("Failed to read input");
+        char::from(buff[0])
     }
     pub fn play(&mut self) -> bool {
-        // println!("Begin Play");
         let mut c = self.readchar();
         if c == '\n' {
             c = self.readchar();
         }
         if self.required.contains_key(&c) {
-            self.word[self.required[&c]] = c;
+            let pos = self.required.get(&c).unwrap();
+            for i in pos {
+                self.word[*i] = c;
+            }
             self.required.remove(&c);
             true
         } else {
             false
         }
     }
-    fn get_word(&self) -> String {
-        let mut result = String::new();
-        for i in 0..self.word.len() {
-            if self.word[i] == '0' {
-                result.push('_');
-            } else {
-                result.push(self.word[i]);
-            }
-        }
-        result
-    }
+
     pub fn run(&mut self) {
         let man = [
             r#"
@@ -112,19 +105,24 @@ impl HangMan {
                   |   |
                  _o_  |
                   |   |
-                 / \\ |
+                 / \  |
                 ______|_"#,
         ];
         let can = 7;
         let mut i = 0;
         while i < can && !self.required.is_empty() {
-            println!("{}\n Word :{}", man[i], self.get_word());
+            println!(
+                "{}\n Word :{}",
+                man[i],
+                self.word.iter().collect::<String>()
+            );
             println!("Entr YOur choice :");
             if !self.play() {
                 i += 1;
             }
         }
         if i < can {
+            println!("The word is {}", self.given);
             println!("Congratulations you won");
         } else {
             println!("Try again the word was {}", self.given);
